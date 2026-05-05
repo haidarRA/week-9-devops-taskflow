@@ -1,0 +1,11 @@
+# Build artifacts
+pbl-taskflow-go/bin/
+pbl-taskflow-go/coverage.out
+
+# Environment
+pbl-taskflow-go/.env
+
+# OS & editor
+.DS_Store
+.idea/
+.vscode/
