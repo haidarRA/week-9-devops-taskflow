@@ -104,6 +104,7 @@
 ### Rincian Setiap Stage
 
 #### Stage 0: Init
+##### 1
 Berfungsi untuk memastikan dependensi siap dan kode bisa dikompilasi dasar.
 `.gitlab-ci.yml`:
 ```bash
@@ -174,6 +175,51 @@ compile-binary:
 - Security & Quality: Menjalankan go vet (cek struktur kode) dan go test -race (cek konflik memori) secara simultan.
 
 - Hard-Gate Coverage: Pipeline akan langsung GAGAL jika pengujian mencakup kurang dari 75% kode, memastikan fitur baru tidak di-push tanpa tes.
+
+##### 2
+Memperbaiki BUG, terdapat 3 BUG untuk diperbaiki
+
+**BUG 1: `BUG: != seharusnya =`**
+
+Sebelum
+```
+FROM tasks WHERE status != $1 ORDER BY created_at DESC`
+```
+Setelah
+```
+FROM tasks WHERE status = $1 ORDER BY created_at DESC`
+```
+Dokumentasi:
+
+<img width="754" height="229" alt="image" src="https://github.com/user-attachments/assets/0238ed02-5cd1-4c34-9bb2-5eb8aaa93170" />
+
+**BUG 2: `BUG: != seharusnya ==`**
+
+Sebelum
+```
+if t.Status != status { // BUG: seharusnya == bukan !=
+```
+Setelah
+```
+if t.Status == status { // BUG: seharusnya == bukan !=
+```
+Dokumentasi:
+
+<img width="681" height="232" alt="image" src="https://github.com/user-attachments/assets/bfff5b97-d0c1-4a6a-9104-2db698559f71" />
+
+**BUG 3: `BUG: integer division — hasil selalu 0 kecuali semua task selesai.`**
+
+Sebelum
+```
+return float64(completed/len(tasks)) * 100
+```
+Setelah
+```
+return (float64(completed) / float64(len(tasks))) * 100
+```
+Dokumentasi:
+
+<img width="519" height="255" alt="image" src="https://github.com/user-attachments/assets/5137e323-9581-470f-bb64-97c78e05c088" />
 
 #### Stage 1: Code Checkout & Setup
 - Trigger: Push ke branch `main` atau `develop` serta Merge Request.
