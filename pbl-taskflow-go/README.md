@@ -280,8 +280,10 @@ Tampilan indikator berhasil pada pipeline:
 
 Dari hasil beberapa dokumentasi di atas membuktikan bahwa taskflow berhasil memperbaiki semua bug dengan benar, melewati semua test dengan status PASS, telah membuat 2 test baru, dan coverage berada di nilai ≥ 75% yaitu 75.1%
 
-#### Stage 3: Smoke Test
+#### Stage 4: Smoke Test
 
+
+```
 ┌──────────────────────────────────────────────────────────────┐
 │                BUILD DOCKER IMAGE SELESAI                    │
 │             Image sudah ada di GitLab Registry               │
@@ -376,5 +378,5 @@ Dari hasil beberapa dokumentasi di atas membuktikan bahwa taskflow berhasil memp
                     │  app + postgres      │
                     └──────────────────────┘
 
-
+```
 
