@@ -421,3 +421,64 @@ Stable tag:
 <img width="1140" height="751" alt="image" src="https://github.com/user-attachments/assets/48ea12a6-84a2-41f1-b161-9bd6bc957132" />
 
 <img width="1541" height="389" alt="image" src="https://github.com/user-attachments/assets/d040f2e3-9c60-432e-a579-f55b5b016a01" />
+
+
+#### Stage 6 — Security Audit Pipeline
+
+##### Tujuan
+Menambahkan audit keamanan ke GitLab CI agar pipeline gagal otomatis jika ditemukan vulnerability dengan severity `HIGH` atau `CRITICAL`, sambil tetap menghasilkan artifact laporan JSON.
+
+##### Kategori Security Scan yang Dikerjakan
+1. **SCA (Dependency CVE)** menggunakan `trivy fs`.
+2. **Container Image Scan** menggunakan `trivy image`.
+
+##### Implementasi di Pipeline
+1. Menambah stage `security-scan`.
+2. Job `security_sca_fs`:
+   - Menjalankan `trivy fs` dua kali:
+     - Output JSON artifact (`--exit-code 0`)
+     - Gate blocker (`--exit-code 1`)
+3. Job `security_container_image`:
+   - Menjalankan `trivy image` dua kali:
+     - Output JSON artifact (`--exit-code 0`)
+     - Gate blocker (`--exit-code 1`)
+4. Artifact yang dihasilkan:
+   - `security-reports/trivy-fs-report.json`
+   - `security-reports/trivy-image-report.json`
+5. Job release/stable tag dibuat bergantung ke hasil stage security scan agar tidak jalan saat security job gagal.
+
+##### Hasil Uji (Branch `main`)
+1. `security_sca_fs` menemukan `3` vulnerability (`HIGH: 1`, `CRITICAL: 2`) dan job gagal dengan `exit code 1`.
+2. `security_container_image` menemukan `12` vulnerability (`HIGH: 9`, `CRITICAL: 3`) dan job gagal dengan `exit code 1`.
+3. Kedua job tetap meng-upload artifact JSON (`201 Created`).
+4. Pipeline `main` berstatus **Failed** pada stage `security-scan`, menandakan gate keamanan berjalan sesuai requirement.
+
+##### Analisis Temuan (Ringkas)
+1. **True positive** utama: `github.com/jackc/pgx/v5` (dipakai langsung oleh repository PostgreSQL).
+2. `golang.org/x/crypto` dan beberapa CVE stdlib perlu analisis reachability lebih lanjut; sebagian berpotensi false positive tergantung jalur kode runtime.
+
+### Rekomendasi Perbaikan
+1. Upgrade `github.com/jackc/pgx/v5` ke minimal `v5.9.0`.
+2. Upgrade `golang.org/x/crypto` ke minimal `v0.35.0`.
+3. Upgrade Go toolchain/runtime ke patch terbaru dan rebuild image.
+4. Pertahankan gate `HIGH/CRITICAL` agar kerentanan tidak lolos ke rilis `stable`.
+
+### Bukti Screenshot Skenario 6
+1. Job `security_sca_fs` gagal karena gate HIGH/CRITICAL + artifact ter-upload.
+
+<img width="1440" height="811" alt="Image" src="https://github.com/user-attachments/assets/57b56fc9-d21a-4b43-997e-74b324d64fd1" />
+
+
+2. Job `security_container_image` gagal karena gate HIGH/CRITICAL + artifact ter-upload.
+
+<img width="1440" height="811" alt="Image" src="https://github.com/user-attachments/assets/6c6f084b-ce4e-4f9c-bdc2-e10efb11bba1" />
+
+
+3. Daftar pipeline menunjukkan pipeline `main` status **Failed** setelah stage security scan.
+
+<img width="1440" height="811" alt="Image" src="https://github.com/user-attachments/assets/130f725a-4115-4eda-b2fe-e26d650b7d9a" />
+
+
+4. Filter branch `main` menampilkan histori pipeline dan status gagal pada pipeline security scan.
+
+<img width="1440" height="811" alt="Image" src="https://github.com/user-attachments/assets/0f339a99-a8fc-4ec2-bfee-0fe39e526b70" />
