@@ -457,6 +457,19 @@ Menambahkan audit keamanan ke GitLab CI agar pipeline gagal otomatis jika ditemu
 1. **True positive** utama: `github.com/jackc/pgx/v5` (dipakai langsung oleh repository PostgreSQL).
 2. `golang.org/x/crypto` dan beberapa CVE stdlib perlu analisis reachability lebih lanjut; sebagian berpotensi false positive tergantung jalur kode runtime.
 
+##### False Positive vs True Positive per Kategori
+1. **Kategori A — SCA (`trivy fs`)**
+   - **True Positive**
+     - `CVE-2026-33816` pada `github.com/jackc/pgx/v5` karena dependency ini dipakai langsung di `internal/repository/postgres.go`.
+   - **Potential False Positive**
+     - `CVE-2024-45337` dan `CVE-2025-22869` pada `golang.org/x/crypto` (komponen `ssh`), perlu validasi reachability karena aplikasi tidak memakai fitur SSH secara eksplisit.
+2. **Kategori D — Container Image (`trivy image`)**
+   - **True Positive**
+     - `CVE-2026-33816` (`pgx/v5`) tetap muncul pada image runtime.
+     - Beberapa CVE `stdlib` terkait TLS/X509 berpotensi relevan untuk API service berbasis HTTP.
+   - **Potential False Positive**
+     - CVE `stdlib` pada `archive/tar`/`archive/zip` dapat menjadi tidak relevan jika jalur parsing arsip tidak dipakai di runtime.
+
 ### Rekomendasi Perbaikan
 1. Upgrade `github.com/jackc/pgx/v5` ke minimal `v5.9.0`.
 2. Upgrade `golang.org/x/crypto` ke minimal `v0.35.0`.
