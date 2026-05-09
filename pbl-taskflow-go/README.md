@@ -279,3 +279,102 @@ Tampilan indikator berhasil pada pipeline:
 
 
 Dari hasil beberapa dokumentasi di atas membuktikan bahwa taskflow berhasil memperbaiki semua bug dengan benar, melewati semua test dengan status PASS, telah membuat 2 test baru, dan coverage berada di nilai ≥ 75% yaitu 75.1%
+
+#### Stage 3: Smoke Test
+
+┌──────────────────────────────────────────────────────────────┐
+│                BUILD DOCKER IMAGE SELESAI                    │
+│             Image sudah ada di GitLab Registry               │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │   smoke_test_job     │
+                    │   Stage: verify      │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │  Docker-in-Docker    │
+                    │  Service Aktif       │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │  Login ke Registry   │
+                    │  docker login        │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │  Pull Image App      │
+                    │  $CONTAINER_IMAGE    │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │  Buat Network Docker │
+                    │  smoke-net           │
+                    └──────────┬───────────┘
+                               │
+              ┌────────────────┴────────────────┐
+              │                                 │
+              ▼                                 ▼
+   ┌──────────────────────┐          ┌──────────────────────┐
+   │  Jalankan PostgreSQL │          │   Jalankan App       │
+   │  postgres-smoke      │◄─────────│   app-smoke          │
+   │  port 5432           │ DATABASE │   port 8080          │
+   └──────────┬───────────┘          └──────────┬───────────┘
+              │                                 │
+              ▼                                 ▼
+   ┌──────────────────────┐          ┌──────────────────────┐
+   │  Tunggu Database     │          │  Tunggu App Start    │
+   │  pg_isready          │          │  sleep 15            │
+   └──────────┬───────────┘          └──────────┬───────────┘
+              │                                 │
+              └────────────────┬────────────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │  Buat Socat Tunnel   │
+                    │ localhost:8080       │
+                    │        ke app:8080   │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+                    ┌──────────────────────┐
+                    │  Smoke Test /health  │
+                    │  curl localhost:8080 │
+                    └──────────┬───────────┘
+                               │
+                    ❌ ADA FAILURE? ❌
+                    │         │
+              YES  ├─────────┤  NO
+                   │         │
+                   ▼         ▼
+            ┌──────────┐  ┌──────────────────────┐
+            │  LOG APP │  │ Smoke Test /stats    │
+            │  FAILED  │  │ /api/v1/stats        │
+            │  exit 1  │  └──────────┬───────────┘
+            └────┬─────┘             │
+                 │        ❌ ADA FAILURE? ❌
+                 │        │         │
+                 │  YES  ├─────────┤  NO
+                 │       │         │
+                 │       ▼         ▼
+                 │ ┌──────────┐  ┌──────────────────────┐
+                 │ │  LOG APP │  │ SMOKE TEST BERHASIL  │
+                 │ │  FAILED  │  │ ✅                   │
+                 │ │  exit 1  │  └──────────┬───────────┘
+                 │ └────┬─────┘             │
+                 │      │                   │
+                 └──────┴─────────┬─────────┘
+                                  ▼
+                    ┌──────────────────────┐
+                    │  Cleanup Container   │
+                    │  stop & remove       │
+                    │  app + postgres      │
+                    └──────────────────────┘
+
+
+
