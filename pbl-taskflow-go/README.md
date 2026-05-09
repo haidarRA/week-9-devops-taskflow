@@ -380,3 +380,44 @@ Dari hasil beberapa dokumentasi di atas membuktikan bahwa taskflow berhasil memp
 
 ```
 
+#### Stage 5: Rollback & Stable Tag
+
+Di directory `pbl-taskflow-go`, jalankan command berikut:
+
+```text
+make rollback ROLLBACK_TAG=<image-tag> IMAGE=registry.gitlab.com/haidarra-devops/week-9-devops-taskflow
+```
+
+Jika ingin rollback ke image tertentu:
+
+```text
+make rollback ROLLBACK_TAG=sha-<commit-short-sha> IMAGE=registry.gitlab.com/haidarra-devops/week-9-devops-taskflow
+```
+
+##### Contoh
+
+Rollback ke image tertentu:
+
+```text
+make rollback ROLLBACK_TAG=sha-1a2b3c4d IMAGE=registry.gitlab.com/haidarra-devops/week-9-devops-taskflow
+````
+
+Rollback ke image stable:
+
+```text
+make rollback ROLLBACK_TAG=stable IMAGE=registry.gitlab.com/haidarra-devops/week-9-devops-taskflow
+````
+
+##### Bukti Screenshot
+
+Rollback:
+
+<img width="1164" height="388" alt="image" src="https://github.com/user-attachments/assets/23f8cd17-8c5d-4a7a-8de1-adcb792cd6d5" />
+
+<img width="1169" height="385" alt="image" src="https://github.com/user-attachments/assets/107c880c-3e02-4dee-ba93-f0651267b570" />
+
+Stable tag:
+
+<img width="1140" height="751" alt="image" src="https://github.com/user-attachments/assets/48ea12a6-84a2-41f1-b161-9bd6bc957132" />
+
+<img width="1541" height="389" alt="image" src="https://github.com/user-attachments/assets/d040f2e3-9c60-432e-a579-f55b5b016a01" />
