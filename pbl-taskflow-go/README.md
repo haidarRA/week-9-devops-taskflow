@@ -461,6 +461,10 @@ Catatan konfigurasi:
 ## Log Eksekusi Pipeline
 
 Hasil pipeline untuk commit `96bca13b`:
+<img width="1280" height="831" alt="image" src="https://github.com/user-attachments/assets/ea5e4537-4f88-46e0-95ca-36a58ac5f70c" />
+<img width="1280" height="831" alt="image" src="https://github.com/user-attachments/assets/b0b54e6d-6523-4284-90fe-4f123f39af63" />
+<img width="1280" height="709" alt="image" src="https://github.com/user-attachments/assets/c74694c2-70ea-493f-bee5-61a47b0e0c9a" />
+<img width="1280" height="379" alt="image" src="https://github.com/user-attachments/assets/13b5f843-c4e3-46e2-82d6-828ad6d7908d" />
 
 | Tahap | Waktu | Durasi | Status |
 |---|---|---|---|
@@ -530,6 +534,8 @@ size: 738
 ---
 
 ## Registry — Image yang Dipublikasikan
+
+<img width="1600" height="174" alt="image" src="https://github.com/user-attachments/assets/bffb8900-3770-4e7d-b196-4fa8d39c11f5" />
 
 | Tag | Ukuran | Digest | Dipublikasikan |
 |---|---|---|---|
