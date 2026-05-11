@@ -379,6 +379,185 @@ Dari hasil beberapa dokumentasi di atas membuktikan bahwa taskflow berhasil memp
                     └──────────────────────┘
 
 ```
+# Docker Build & Container Registry
+
+Dokumen ini mencakup implementasi Docker build dan integrasi registry untuk layanan Taskflow API. Implementasi menggunakan Dockerfile multi-stage untuk menghasilkan image produksi yang minimal, yang kemudian secara otomatis di-build, di-tag, dan di-push ke GitLab Container Registry melalui pipeline CI/CD.
+
+---
+
+## Struktur Pipeline
+
+Pipeline terdiri dari 6 stage yang berjalan secara berurutan:
+
+```
+init → test → build → package → verify → release
+```
+
+| Stage | Job | Keterangan |
+|---|---|---|
+| `init` | `prepare_module` | `go mod tidy`, menghasilkan artifact `go.mod` |
+| `test` | `test_job` | `go test -v ./...` |
+| `build` | `compile-binary` | Build binary, menghasilkan artifact `bin/taskflow-api` |
+| `package` | `build-docker-image` | **Build & push Docker image** ← bagian ini |
+| `verify` | `smoke_test_job` | Smoke test endpoint `/health` dan `/api/v1/stats` |
+| `release` | `update-stable-image` | Tag image sebagai `stable` jika smoke test lulus |
+
+Stage `package` hanya dieksekusi pada branch `main`.
+
+---
+
+### Penjelasan Desain
+
+**Stage 1 — Builder** menggunakan `golang:1.23-alpine` sebagai environment kompilasi. Urutan instruksi dirancang untuk memaksimalkan cache layer Docker: `go.mod` dan `go.sum` disalin dan dependency diunduh terlebih dahulu sebelum source code di-copy, sehingga layer download dependency tidak perlu diulang selama `go.mod` tidak berubah.
+
+Flag kompilasi yang digunakan:
+
+| Flag | Keterangan |
+|---|---|
+| `CGO_ENABLED=0` | Menonaktifkan CGO sehingga binary bersifat static dan tidak bergantung pada shared library sistem |
+| `GOOS=linux GOARCH=amd64` | Cross-compile untuk target Linux x86-64 |
+| `-ldflags="-w -s"` | Menghapus debug info dan symbol table untuk memperkecil ukuran binary |
+
+**Stage 2 — Runtime** menggunakan `scratch` sebagai base image — image kosong tanpa OS, shell, atau library apapun. Hanya dua file yang disalin dari stage builder: sertifikat CA untuk koneksi TLS dan binary `taskflow-api`. Hasilnya adalah image yang sangat kecil dengan attack surface minimal.
+
+---
+
+## Konfigurasi Pipeline CI/CD
+
+Job `build-docker-image` pada stage `package`:
+
+```yaml
+variables:
+  CONTAINER_IMAGE: $CI_REGISTRY_IMAGE:sha-$CI_COMMIT_SHORT_SHA
+  STABLE_IMAGE:    $CI_REGISTRY_IMAGE:stable
+  LATEST_IMAGE:    $CI_REGISTRY_IMAGE:latest
+
+build-docker-image:
+  stage: package
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
+  needs:
+    - compile-binary
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY
+        -u $CI_REGISTRY_USER --password-stdin
+    - docker build -t $CONTAINER_IMAGE .
+    - docker push $CONTAINER_IMAGE
+  only:
+    - main
+```
+
+Catatan konfigurasi:
+
+- `DOCKER_TLS_CERTDIR: ""` — diset kosong agar Docker daemon dan client berkomunikasi tanpa TLS di dalam environment DinD pada GitLab shared runner.
+- `needs: [compile-binary]` — job ini hanya berjalan setelah stage `build` sukses, sekaligus mengambil artifact binary yang dihasilkan.
+- `only: [main]` — membatasi eksekusi hanya pada branch `main`.
+
+---
+
+## Log Eksekusi Pipeline
+
+Hasil pipeline untuk commit `96bca13b`:
+
+| Tahap | Waktu | Durasi | Status |
+|---|---|---|---|
+| Preparing docker+machine executor | 02:45:39 | 00:28 | Berhasil |
+| Preparing environment | 02:46:07 | 00:01 | Berhasil |
+| Getting source from Git repository | 02:46:08 | 00:01 | Berhasil |
+| Downloading artifacts (compile-binary) | 02:46:09 | 00:01 | Berhasil |
+| Executing step_script | 02:46:10 | 00:44 | Berhasil |
+| Cleaning up project directory | 02:46:54 | 00:01 | Berhasil |
+| **Job succeeded** | 02:46:56 | — | **Berhasil** |
+
+**Runner:** `green-4.saas-linux-small-amd64` | **Job ID:** `14231429555`
+
+**Detail build per layer:**
+
+| Layer | Instruksi | Durasi |
+|---|---|---|
+| #5 | `FROM golang:1.23-alpine` | 5.8s |
+| #6 | `RUN apk add --no-cache git ca-certificates` (29 packages, 20 MiB) | 3.4s |
+| #7 | `WORKDIR /build` | 0.0s |
+| #8 | `COPY go.mod go.sum ./` | 0.0s |
+| #9 | `RUN go mod download` | 1.4s |
+| #10 | `COPY . .` | 0.0s |
+| #11 | `RUN go vet ./...` | 24.8s |
+| #12 | `RUN go build ... -o taskflow-api` | 0.7s |
+| #13 | `COPY ca-certificates.crt` | 0.0s |
+| #14 | `COPY taskflow-api` | 0.1s |
+| #15 | Exporting image | 0.1s |
+
+---
+
+## Autentikasi Registry
+
+Login menggunakan CI/CD variables bawaan GitLab tanpa kredensial yang di-hardcode:
+
+```bash
+$ echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY \
+    -u $CI_REGISTRY_USER --password-stdin
+Login Succeeded
+```
+
+---
+
+## Tagging dan Push Image
+
+Image di-tag menggunakan format `sha-<7-karakter-commit>` yang didefinisikan di variabel global pipeline:
+
+```
+CONTAINER_IMAGE = $CI_REGISTRY_IMAGE:sha-$CI_COMMIT_SHORT_SHA
+                → registry.gitlab.com/haidarra-devops/week-9-devops-taskflow:sha-96bca13b
+```
+
+```bash
+$ docker build -t $CONTAINER_IMAGE .
+$ docker push $CONTAINER_IMAGE
+```
+
+Hasil push:
+
+```
+337a2c1016c5: Pushed
+de0c226909cb: Pushed
+sha-96bca13b: digest: sha256:b64d6f0d18c906f12e469c911678ecb30c21ef1ce60e238311f2bcb6a45ad349
+size: 738
+```
+
+---
+
+## Registry — Image yang Dipublikasikan
+
+| Tag | Ukuran | Digest | Dipublikasikan |
+|---|---|---|---|
+| `latest` | 3.36 MiB | `b64d6f0` | 3 hari lalu |
+| `sha-96bca13b` | 3.36 MiB | `b64d6f0` | 3 hari lalu |
+
+Kedua tag memiliki digest yang sama, mengonfirmasi bahwa keduanya merujuk pada image yang identik.
+
+---
+
+## Verifikasi Ukuran Image
+
+```bash
+$ docker images --format "Tag {{.Tag}} | Size {{.Size}}" | grep $CI_COMMIT_SHORT_SHA
+Tag sha-96bca13b | Size 9.65MB
+```
+
+---
+
+## Perbandingan Ukuran Image
+
+| Metode Build | Base Image | Ukuran Final |
+|---|---|---|
+| Multi-stage (implementasi ini) | `golang:1.23-alpine` + `scratch` | **9.65 MB** |
+| Single-stage (pembanding) | `golang:1.22` | ~300 MB (estimasi) |
+
+Multi-stage build menghasilkan image sekitar **97% lebih kecil** dibandingkan single-stage build. Pada pendekatan single-stage, seluruh Go toolchain (~300 MB), dependensi build, dan source code ikut terbawa ke dalam image final. Dengan multi-stage, stage runtime hanya menerima dua file dari stage builder — binary `taskflow-api` dan sertifikat CA.
+
 
 #### Stage 5: Rollback & Stable Tag
 
