@@ -455,20 +455,36 @@ Menambahkan audit keamanan ke GitLab CI agar pipeline gagal otomatis jika ditemu
 
 ##### Analisis Temuan (Ringkas)
 1. **True positive** utama: `github.com/jackc/pgx/v5` (dipakai langsung oleh repository PostgreSQL).
-2. `golang.org/x/crypto` dan beberapa CVE stdlib perlu analisis reachability lebih lanjut; sebagian berpotensi false positive tergantung jalur kode runtime.
+2. `golang.org/x/crypto` dan beberapa CVE stdlib perlu analisis reachability lebih lanjut; sebagian belum dapat dipastikan exploitable pada runtime aplikasi saat ini.
 
 ##### False Positive vs True Positive per Kategori
+Analisis ini membedakan tiga status:
+1. **True Positive**: CVE terdeteksi benar pada package/version yang ada.
+2. **Potentially Non-Reachable**: CVE valid, namun jalur kode rentan kemungkinan tidak dieksekusi oleh aplikasi saat ini.
+3. **False Positive (scanner error)**: scanner salah deteksi package/version/CVE mapping.
+
+Validasi reachability tambahan menggunakan `govulncheck`:
+```bash
+govulncheck ./...
+```
+Hasil:
+- `Your code is affected by 0 vulnerabilities.`
+- Ada vulnerability pada module/dependency, tetapi code path rentan **tidak dipanggil** oleh kode aplikasi saat ini.
+
 1. **Kategori A — SCA (`trivy fs`)**
    - **True Positive**
      - `CVE-2026-33816` pada `github.com/jackc/pgx/v5` karena dependency ini dipakai langsung di `internal/repository/postgres.go`.
-   - **Potential False Positive**
+   - **Potentially Non-Reachable (requires reachability validation)**
      - `CVE-2024-45337` dan `CVE-2025-22869` pada `golang.org/x/crypto` (komponen `ssh`), perlu validasi reachability karena aplikasi tidak memakai fitur SSH secara eksplisit.
 2. **Kategori D — Container Image (`trivy image`)**
    - **True Positive**
      - `CVE-2026-33816` (`pgx/v5`) tetap muncul pada image runtime.
      - Beberapa CVE `stdlib` terkait TLS/X509 berpotensi relevan untuk API service berbasis HTTP.
-   - **Potential False Positive**
+   - **Potentially Non-Reachable (requires reachability validation)**
      - CVE `stdlib` pada `archive/tar`/`archive/zip` dapat menjadi tidak relevan jika jalur parsing arsip tidak dipakai di runtime.
+3. **Kesimpulan False Positive**
+   - Sampai laporan ini ditulis, **tidak ada false positive murni yang terkonfirmasi**.
+   - Temuan yang belum pasti diklasifikasikan sebagai **potentially non-reachable**, bukan false positive.
 
 ### Rekomendasi Perbaikan
 1. Upgrade `github.com/jackc/pgx/v5` ke minimal `v5.9.0`.
