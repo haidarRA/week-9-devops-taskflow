@@ -283,6 +283,8 @@ Dari hasil beberapa dokumentasi di atas membuktikan bahwa taskflow berhasil memp
 #### Stage 4: Smoke Test
 
 
+Setelah selesai Covarage validation, berikut adalah aristektur untuk smoke testing otomatis berjalan:
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                BUILD DOCKER IMAGE SELESAI                    │
@@ -379,6 +381,16 @@ Dari hasil beberapa dokumentasi di atas membuktikan bahwa taskflow berhasil memp
                     └──────────────────────┘
 
 ```
+
+**Isolated Network:** Membuat smoke-net agar kontainer Aplikasi dan Database PostgreSQL dapat saling berkomunikasi via hostname.
+
+**Ephemeral Environment:** Database dan Aplikasi dijalankan secara sementara dalam satu tahapan (verify) untuk mensimulasikan kondisi produksi.
+
+**Port Forwarding (Socat):** Menggunakan socat sebagai jembatan (tunnel) untuk menghubungkan ``localhost:8080`` pada GitLab Runner ke kontainer aplikasi di dalam Docker service. Hal ini memungkinkan perintah curl dijalankan langsung ke target localhost.
+
+
+
+
 # Docker Build & Container Registry
 
 Dokumen ini mencakup implementasi Docker build dan integrasi registry untuk layanan Taskflow API. Implementasi menggunakan Dockerfile multi-stage untuk menghasilkan image produksi yang minimal, yang kemudian secara otomatis di-build, di-tag, dan di-push ke GitLab Container Registry melalui pipeline CI/CD.
